@@ -11,27 +11,27 @@ class LTITool_Tool_Controller extends LTITool_Master_Controller
     public static function getRouteMap ()
     {
         return [
-            '/game/run' => ['callback' => 'game'],
-            '/game/configure' => ['callback' => 'configure'],
-            '/game/jwks' => ['callback' => 'jwks'],
+            '/breakout/run' => ['callback' => 'breakout'],
+            '/breakout/configure' => ['callback' => 'configure'],
+            '/breakout/jwks' => ['callback' => 'jwks'],
             '/api/scoreboard' => ['callback' => 'scoreboard'],
             '/api/score' => ['callback' => 'score'],
 
-            '/register' => ['callback' => 'register'],
+            // '/register' => ['callback' => 'register'],
         ];
     }
 
-    public function game ()
+
+    public function breakout ()
     {
         $launch = $this->getRouteVariable('launch');
 
         $this->setToolTemplate();
 
         $this->template->launch = $launch;
-        // $this->template->curr_diff = 'noob';
-        $this->template->curr_diff = @$launch->get_launch_data()['https://purl.imsglobal.org/spec/lti/claim/custom']['difficulty'] ?: 'normal';
+        $this->template->curr_diff = $launch->get_launch_data()['https://purl.imsglobal.org/spec/lti/claim/custom']['difficulty'] ?: 'normal';
         $this->template->curr_user_name = $launch->get_launch_data()['name'];
-        $this->template->serviceName = 'game';
+        $this->template->serviceName = 'breakout';
     }
 
     public function setToolTemplate ()
@@ -50,13 +50,12 @@ class LTITool_Tool_Controller extends LTITool_Master_Controller
         }
 
         $resource = \IMSGlobal\LTI\LTI_Deep_Link_Resource::new()
-            ->set_url($this->baseUrl('/game/run'))
+            ->set_url($this->baseUrl('/breakout/run'))
             ->set_custom_params(['difficulty' => $this->request->getQueryParameter('diff')])
             ->set_title('Breakout ' . $this->request->getQueryParameter('diff') . ' mode!');
 
         $launch->get_deep_link()
             ->output_response_form([$resource]);
-        // exit;
     }
 
     public function scoreboard ()
@@ -215,8 +214,8 @@ class LTITool_Tool_Controller extends LTITool_Master_Controller
         $config = [
             'title' => 'Breakout Game',
             'description' => 'BO Game desc',
-            'oidc_initiation_url' => $this->baseUrl('/lti/game/login'),
-            'target_link_uri' => $this->baseUrl('/lti/game/launch'),
+            'oidc_initiation_url' => $this->baseUrl('/lti/breakout/login'),
+            'target_link_uri' => $this->baseUrl('/lti/breakout/launch'),
             'scopes' => [
                 'https://purl.imsglobal.org/spec/lti-ags/scope/score',
                 'https://purl.imsglobal.org/spec/lti-ags/scope/lineitem',
@@ -235,7 +234,7 @@ class LTITool_Tool_Controller extends LTITool_Master_Controller
                                 "enabled" => true,
                                 "placement" => "link_selection",
                                 "message_type" => "LtiDeepLinkingRequest",
-                                "target_link_uri" => $this->baseUrl('/lti/game/launch'),
+                                "target_link_uri" => $this->baseUrl('/lti/breakout/launch'),
                                 "canvas_icon_class" => "icon-lti",
                                 "selection_height" => 1000,
                                 "selection_width" => 800
@@ -245,7 +244,7 @@ class LTITool_Tool_Controller extends LTITool_Master_Controller
                                 "enabled" => true,
                                 "placement" => "assignment_selection",
                                 "message_type" => "LtiDeepLinkingRequest",
-                                "target_link_uri" => $this->baseUrl('/lti/game/launch'),
+                                "target_link_uri" => $this->baseUrl('/lti/breakout/launch'),
                                 "canvas_icon_class" => "icon-lti",
                                 "selection_height" => 1000,
                                 "selection_width" => 800
@@ -256,7 +255,7 @@ class LTITool_Tool_Controller extends LTITool_Master_Controller
                                 "placement" => "course_navigation",
                                 "default" => "disabled",
                                 "message_type" => "LtiResourceLinkRequest",
-                                "target_link_uri" => $this->baseUrl('/lti/game/launch'),
+                                "target_link_uri" => $this->baseUrl('/lti/breakout/launch'),
                                 "canvas_icon_class" => "icon-lti"
                             ]
                         ]
@@ -275,13 +274,6 @@ class LTITool_Tool_Controller extends LTITool_Master_Controller
         echo json_encode($config);
         exit;
     }
-
-
-
-
-
-
-
 
 }
     

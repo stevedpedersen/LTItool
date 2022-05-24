@@ -3,8 +3,8 @@
 /**
  * LTI KeySet for LTI Keys
  * 
- * 
  * @author      Charles O'Sullivan (chsoney@sfsu.edu)
+ * @author      Steve Pedersen (pedersen@sfsu.edu)
  * @copyright   Copyright &copy; San Francisco State University.
  */
 class At_LTI_KeySet extends Bss_ActiveRecord_Base
@@ -22,17 +22,22 @@ class At_LTI_KeySet extends Bss_ActiveRecord_Base
         ];
     }
 
-    public function generateKeySet ($keySetId, $url, $alg)
+    public function generateKeySet ($alg = 'RS256')
     {
-        $keySet = $this->createInstance();
-        $keySet->id = $keySetId;
-        $keySet->url = $url;
-        $keySet->save();
+        $this->id = self::UUID();
+        $this->url = $this->getApplication()->baseUrl("/lti/jwks/$this->id");
+        $this->save();
 
-        $public = $this->getSchema('At_LTI_Key')->createInstance();
-        $private = $this->getSchema('At_LTI_Key')->createInstance();
-        list($pubKey, $pivKey) = $public->generateKeys('rs256');
+        $this->keys = $this->getSchema('At_LTI_Key')->createInstance()->generateKeys($this, $alg);
+        $this->save();
+        $this->keys->save();
 
+        return $this;
+    }
 
+    public static function UUID($data = null)
+    {
+        $data = $data ?? random_bytes(16);
+        return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
     }
 }

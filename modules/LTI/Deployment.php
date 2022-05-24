@@ -5,6 +5,7 @@
  * 
  * 
  * @author      Charles O'Sullivan (chsoney@sfsu.edu)
+ * @author      Steve Pedersen (pedersen@sfsu.edu)
  * @copyright   Copyright &copy; San Francisco State University.
  */
 class At_LTI_Deployment extends Bss_ActiveRecord_Base
