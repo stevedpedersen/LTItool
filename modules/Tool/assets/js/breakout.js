@@ -446,7 +446,7 @@ var endGame = function() {
 
 var refreshScoreBoard = function() {
     var scores = JSON.parse(this.responseText);
-    console.log(scores);
+    console.log(scores.all.scoreboard);
     var scoreboard = scores.all.scoreboard;
     var output = '<caption id="leadercaption" style="color:#fff;">All</caption>';
     output += '<tr><th style="padding-right:5px;">Score </th><th style="padding-right:5px;">Time </th><th style="padding-right:5px;">Name</th></tr>';

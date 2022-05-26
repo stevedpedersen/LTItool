@@ -16,22 +16,8 @@ class LTITool_Tool_Controller extends LTITool_Master_Controller
             '/breakout/jwks' => ['callback' => 'jwks'],
             '/api/scoreboard' => ['callback' => 'scoreboard'],
             '/api/score' => ['callback' => 'score'],
-
             // '/register' => ['callback' => 'register'],
         ];
-    }
-
-
-    public function breakout ()
-    {
-        $launch = $this->getRouteVariable('launch');
-
-        $this->setToolTemplate();
-
-        $this->template->launch = $launch;
-        $this->template->curr_diff = $launch->get_launch_data()['https://purl.imsglobal.org/spec/lti/claim/custom']['difficulty'] ?: 'normal';
-        $this->template->curr_user_name = $launch->get_launch_data()['name'];
-        $this->template->serviceName = 'breakout';
     }
 
     public function setToolTemplate ()
@@ -39,59 +25,56 @@ class LTITool_Tool_Controller extends LTITool_Master_Controller
         $this->template->setMasterTemplate(Bss_Core_PathUtils::path(dirname(__FILE__), 'resources', 'tool.html.tpl'));
     }
 
-    public function configure ()
+    public function breakout ()
     {
-        $launch = \IMSGlobal\LTI\LTI_Message_Launch::from_cache(
-            $this->request->getQueryParameter('launch_id'), new At_LTI_RegistrationDatabase($this->getApplication())
+        $toolManager = new At_LTI_ToolManager($this);
+
+        $this->setToolTemplate();
+
+        $this->template->launch = $toolManager->getLaunch();
+        $this->template->curr_diff = $toolManager->getLaunchCustomData('difficulty') ?: 'normal';
+        $this->template->curr_user_name = $toolManager->getLaunchData('name');
+        $this->template->serviceName = 'breakout';
+    }
+
+    public function configure ()
+    {   
+        $url = $this->baseUrl('/breakout/run');
+        $title = 'Breakout: ' . $this->request->getQueryParameter('diff') . ' mode!';
+
+        $toolManager = new At_LTI_ToolManager($this);
+        $toolManager->sendDeepLinkResource($url, $title,
+            ['difficulty' => $this->request->getQueryParameter('diff')]
         );
+    }
 
-        if (!$launch->is_deep_link_launch()) {
-            throw new Exception("Must be a deep link!");
-        }
+    public function score ()
+    {
+        $agService = At_LTI_ToolManager::GetService('ags', $this);
 
-        $resource = \IMSGlobal\LTI\LTI_Deep_Link_Resource::new()
-            ->set_url($this->baseUrl('/breakout/run'))
-            ->set_custom_params(['difficulty' => $this->request->getQueryParameter('diff')])
-            ->set_title('Breakout ' . $this->request->getQueryParameter('diff') . ' mode!');
+        $grade = $agService->newGrade($this->request->getQueryParameter('score'), 100);
+        $lineitem = $agService->newLineitem('score', 100, 'Score');
+        $agService->putGrade($grade, $lineitem);
 
-        $launch->get_deep_link()
-            ->output_response_form([$resource]);
+        $grade = $agService->newGrade($this->request->getQueryParameter('time'), 999, 'Completed', 'FullyGraded');
+        $lineitem = $agService->newLineitem('time', 999, 'Time Taken');
+        $agService->putGrade($grade, $lineitem);
+
+        echo '{"success" : true}';
+        exit;
     }
 
     public function scoreboard ()
     {
-        $launch = \IMSGlobal\LTI\LTI_Message_Launch::from_cache(
-            $this->request->getQueryParameter('launch_id'), new At_LTI_RegistrationDatabase($this->getApplication())
-        );
+        $agService = At_LTI_ToolManager::GetService('ags', $this);
+        $scores = $agService->getGradesByLineitem('score');
+        $times = $agService->getGradesByLineitem('time');
 
-        if (!$launch->has_nrps()) {
-            throw new Exception("Don't have names and roles!");
-        }
-        if (!$launch->has_ags()) {
-            throw new Exception("Don't have grades!");
-        }
-        $ags = $launch->get_ags();
+        $nrpService = At_LTI_ToolManager::GetService('nrps', $this);
+        $members = $nrpService->getMembers();
 
-        // fetch the scores from this line item
-        $score_lineitem = \IMSGlobal\LTI\LTI_Lineitem::new()
-            ->set_tag('score')
-            ->set_score_maximum(100)
-            ->set_label('Score')
-            ->set_resource_id($launch->get_launch_data()['https://purl.imsglobal.org/spec/lti/claim/resource_link']['id']);
-        $scores = $ags->get_grades($score_lineitem);
-
-        // fetch the times from this line item
-        $time_lineitem = \IMSGlobal\LTI\LTI_Lineitem::new()
-            ->set_tag('time')
-            ->set_score_maximum(999)
-            ->set_label('Time Taken')
-            ->set_resource_id('time'.$launch->get_launch_data()['https://purl.imsglobal.org/spec/lti/claim/resource_link']['id']);
-        $times = $ags->get_grades($time_lineitem);
-
-        // fetch all the members in this course 
-        $members = $launch->get_nrps()->get_members();
-
-        $scoreboard = [];
+        $scoreboards = [];
+        $allScores = [];
 
         foreach ($scores as $score) {
             $result = ['score' => $score['resultScore']];
@@ -107,105 +90,58 @@ class LTITool_Tool_Controller extends LTITool_Master_Controller
                     break;
                 }
             }
-            $scoreboard[] = $result;
-        }
-
-        $scoreboards = [];
-
-        // Groups service
-        $users_by_group = [];
-        $gbs = [];
-        if ($launch->has_gs()) {
-            $gs = $launch->get_gs();
-            $gbs = $gs->get_groups_by_set();
-            foreach ($members as $member) {
-                foreach ($member['group_enrollments'] as $enrollment) {
-                    $users_by_group[$enrollment['group_id']][$member['user_id']] = $member;
-                }
-            }
-        }
-
-        foreach ($gbs as $set)     {
-            $scoreboards[$set['id']] = [
-                'name' => $set['name'],
-                'id' => $set['id'],
-                'scoreboard' => []
-            ];
-            foreach ($set['groups'] as $group_id => $group) {
-                $result = [
-                    'score' => 0,
-                    'time' => 0,
-                    'name' => $group['name']
-                ];
-                foreach ($scores as $score) {
-                    if (isset($users_by_group[$group_id][$score['userId']])) {
-                        $result['score'] += $score['resultScore'];
-                    }
-                }
-                foreach ($times as $time) {
-                    if (isset($users_by_group[$group_id][$time['userId']])) {
-                        $result['time'] += $time['resultScore'];
-                    }
-                }
-                $scoreboards[$set['id']]['scoreboard'][] = $result;
-            }
+            $allScores[] = $result;
         }
 
         $scoreboards['all'] = [
             'name' => 'All',
             'id' => 'all',
-            'scoreboard' => $scoreboard,
+            'scoreboard' => $allScores,
         ];
+        
+
+        $groupService = At_LTI_ToolManager::GetService('gs', $this);
+        
+        if ($gbs = $groupService->getGroupsBySet()) {
+            $users_by_group = [];
+
+            foreach ($members as $member) {
+                foreach ($member['group_enrollments'] as $enrollment) {
+                    $users_by_group[$enrollment['group_id']][$member['user_id']] = $member;
+                }
+            }
+
+            foreach ($gbs as $set)     {
+                $scoreboards[$set['id']] = [
+                    'name' => $set['name'],
+                    'id' => $set['id'],
+                    'scoreboard' => []
+                ];
+                foreach ($set['groups'] as $group_id => $group) {
+                    $result = [
+                        'score' => 0,
+                        'time' => 0,
+                        'name' => $group['name']
+                    ];
+                    foreach ($scores as $score) {
+                        if (isset($users_by_group[$group_id][$score['userId']])) {
+                            $result['score'] += $score['resultScore'];
+                        }
+                    }
+                    foreach ($times as $time) {
+                        if (isset($users_by_group[$group_id][$time['userId']])) {
+                            $result['time'] += $time['resultScore'];
+                        }
+                    }
+                    $scoreboards[$set['id']]['scoreboard'][] = $result;
+                }
+            }
+        }
 
         echo json_encode($scoreboards);
         exit;
     }
 
-    public function score ()
-    {
-        $launch = \IMSGlobal\LTI\LTI_Message_Launch::from_cache(
-            $this->request->getQueryParameter('launch_id'), new At_LTI_RegistrationDatabase($this->getApplication())
-        );
-        
-        if (!$launch->has_ags()) {
-            throw new Exception("Don't have grades!");
-        }
-
-        $grades = $launch->get_ags();
-
-        $score = \IMSGlobal\LTI\LTI_Grade::new()
-            ->set_score_given($_REQUEST['score'])
-            ->set_score_maximum(100)
-            ->set_timestamp(date(DateTime::ISO8601))
-            ->set_activity_progress('Completed')
-            ->set_grading_progress('FullyGraded')
-            ->set_user_id($launch->get_launch_data()['sub']);
-        // column in gradebook
-        $score_lineitem = \IMSGlobal\LTI\LTI_Lineitem::new()
-            ->set_tag('score')
-            ->set_score_maximum(100)
-            ->set_label('Score')
-            ->set_resource_id($launch->get_launch_data()['https://purl.imsglobal.org/spec/lti/claim/resource_link']['id']);
-        $grades->put_grade($score, $score_lineitem);
-
-
-        $time = \IMSGlobal\LTI\LTI_Grade::new()
-            ->set_score_given($_REQUEST['time'])
-            ->set_score_maximum(999)
-            ->set_timestamp(date(DateTime::ISO8601))
-            ->set_activity_progress('Completed')
-            ->set_grading_progress('FullyGraded')
-            ->set_user_id($launch->get_launch_data()['sub']);
-        $time_lineitem = \IMSGlobal\LTI\LTI_Lineitem::new()
-            ->set_tag('time')
-            ->set_score_maximum(999)
-            ->set_label('Time Taken')
-            ->set_resource_id('time'.$launch->get_launch_data()['https://purl.imsglobal.org/spec/lti/claim/resource_link']['id']);
-        $grades->put_grade($time, $time_lineitem);
-        
-        echo '{"success" : true}';
-        exit;
-    }
 
 
 

@@ -6,6 +6,7 @@
 {else}
 <p>LTI Example Tool & Platform</p>
 {/if}
+<a href="lti/registrations" class="btn btn-info">LTI Registrations &rarr;</a>
 </div>
 
 {if !$userContext->account}
