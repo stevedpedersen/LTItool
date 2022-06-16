@@ -6,6 +6,7 @@
 		<base href="{$baseUrl|escape}/">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 		<link rel="stylesheet" type="text/css" href="assets/less/master.less.css?cache=2018050100">
+		<link rel="stylesheet" type="text/css" href="assets/css/tool.css">
 		<link rel="stylesheet" type="text/css" href="assets/css/bootstrap-accessibility.css">
 		<link href='//fonts.googleapis.com/css?family=Montserrat:400,700' rel='stylesheet' type='text/css'>
 		<link rel="icon" type="image/png" href="assets/images/favicon3.png">
